@@ -42,6 +42,7 @@ declare global {
       AUTH_ENABLE_MAGIC_LINK?: string;
       AUTH_FEISHU_APP_ID?: string;
       AUTH_FEISHU_APP_SECRET?: string;
+      AUTH_FEISHU_EMAIL_MAP?: string;
 
       AUTH_GENERIC_OIDC_ID?: string;
       AUTH_GENERIC_OIDC_ISSUER?: string;
@@ -159,6 +160,7 @@ export const getAuthConfig = () => {
       AUTH_CLOUDFLARE_ZERO_TRUST_SECRET: z.string().optional(),
       AUTH_CLOUDFLARE_ZERO_TRUST_ISSUER: z.string().optional(),
 
+      AUTH_FEISHU_EMAIL_MAP: z.string().optional(),
       AUTH_FEISHU_APP_ID: z.string().optional(),
       AUTH_FEISHU_APP_SECRET: z.string().optional(),
 
@@ -252,6 +254,7 @@ export const getAuthConfig = () => {
       AUTH_CLOUDFLARE_ZERO_TRUST_SECRET: process.env.AUTH_CLOUDFLARE_ZERO_TRUST_SECRET,
       AUTH_CLOUDFLARE_ZERO_TRUST_ISSUER: process.env.AUTH_CLOUDFLARE_ZERO_TRUST_ISSUER,
 
+      AUTH_FEISHU_EMAIL_MAP: process.env.AUTH_FEISHU_EMAIL_MAP,
       AUTH_FEISHU_APP_ID: process.env.AUTH_FEISHU_APP_ID,
       AUTH_FEISHU_APP_SECRET: process.env.AUTH_FEISHU_APP_SECRET,
 

@@ -215,6 +215,13 @@ These settings are required for email verification and password reset features.
 - Default: `-`
 - Example: `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 
+#### `AUTH_FEISHU_EMAIL_MAP`
+
+- Type: Optional
+- Description: Explicit `union_id=email` mappings used when the current Feishu scopes cannot return a real email. Separate multiple entries with commas or new lines.
+- Default: `-`
+- Example: `on_xxxxxxxxxxxxxxxx=user@example.com`
+
 ### WeChat
 
 #### `AUTH_WECHAT_ID`

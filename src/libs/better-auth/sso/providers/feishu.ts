@@ -4,7 +4,8 @@ import { type GenericProviderDefinition } from '../types';
 
 const FEISHU_AUTHORIZATION_URL = 'https://accounts.feishu.cn/open-apis/authen/v1/authorize';
 const FEISHU_CONTACT_USER_URL = 'https://open.feishu.cn/open-apis/contact/v3/users';
-const FEISHU_TENANT_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
+const FEISHU_TENANT_TOKEN_URL =
+  'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/authen/v2/oauth/token';
 const FEISHU_USERINFO_URL = 'https://open.feishu.cn/open-apis/authen/v1/user_info';
 
@@ -89,6 +90,28 @@ const parseScopes = (scope: string | undefined) =>
 const pickFeishuEmail = (...emails: Array<string | undefined>) =>
   emails.find((email): email is string => !!email?.trim());
 
+const parseFeishuEmailMap = (value: string | undefined) => {
+  if (!value) return new Map<string, string>();
+
+  return new Map(
+    value
+      .split(/[\n,]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const separatorIndex = entry.indexOf('=');
+        if (separatorIndex === -1) return null;
+
+        const key = entry.slice(0, separatorIndex).trim();
+        const email = entry.slice(separatorIndex + 1).trim();
+        if (!key || !email) return null;
+
+        return [key, email] as const;
+      })
+      .filter((entry): entry is readonly [string, string] => !!entry),
+  );
+};
+
 const resolveFeishuUserIdentifier = (
   profile: FeishuUserProfile,
   tokenPayload?: FeishuTokenPayload,
@@ -136,7 +159,7 @@ const getContactProfile = async (
   const response = await fetch(url, {
     cache: 'no-store',
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      'Authorization': `Bearer ${accessToken}`,
       'content-type': 'application/json; charset=utf-8',
     },
   });
@@ -156,6 +179,7 @@ const provider: GenericProviderDefinition<{
   build: (env) => {
     const clientId = env.AUTH_FEISHU_APP_ID;
     const clientSecret = env.AUTH_FEISHU_APP_SECRET;
+    const emailMap = parseFeishuEmailMap(authEnv.AUTH_FEISHU_EMAIL_MAP);
 
     return {
       authorizationUrl: FEISHU_AUTHORIZATION_URL,
@@ -211,7 +235,8 @@ const provider: GenericProviderDefinition<{
         if (!tokens.accessToken) return null;
 
         const tokenPayload = (tokens as { raw?: FeishuTokenResponse }).raw?.data;
-        const tokenProfile = tokenPayload && isFeishuProfile(tokenPayload) ? tokenPayload : undefined;
+        const tokenProfile =
+          tokenPayload && isFeishuProfile(tokenPayload) ? tokenPayload : undefined;
 
         const response = await fetch(FEISHU_USERINFO_URL, {
           cache: 'no-store',
@@ -246,7 +271,8 @@ const provider: GenericProviderDefinition<{
           if (!pickFeishuEmail(contactProfile?.email, contactProfile?.enterprise_email)) {
             const tenantAccessToken = await getTenantAccessToken(clientId, clientSecret);
             if (tenantAccessToken) {
-              contactProfile = (await getContactProfile(tenantAccessToken, identifier)) ?? contactProfile;
+              contactProfile =
+                (await getContactProfile(tenantAccessToken, identifier)) ?? contactProfile;
             }
           }
         }
@@ -262,7 +288,9 @@ const provider: GenericProviderDefinition<{
             contactProfile?.enterprise_email,
             tokenPayload?.email,
             tokenPayload?.enterprise_email,
-          ) ?? `${unionId}@feishu.sso`;
+          ) ??
+          emailMap.get(unionId) ??
+          `${unionId}@feishu.sso`;
 
         const resolvedProfile = {
           ...profile,

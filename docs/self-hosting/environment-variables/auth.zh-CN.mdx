@@ -213,6 +213,13 @@ LobeHub 在部署时提供了完善的身份验证服务能力，以下是相关
 - 默认值：`-`
 - 示例：`xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 
+#### `AUTH_FEISHU_EMAIL_MAP`
+
+- 类型：可选
+- 描述：当飞书当前授权范围无法返回真实邮箱时，可通过 `union_id=email` 的映射显式指定邮箱，用逗号或换行分隔多条。
+- 默认值：`-`
+- 示例：`on_xxxxxxxxxxxxxxxx=user@example.com`
+
 ### 微信
 
 #### `AUTH_WECHAT_ID`
