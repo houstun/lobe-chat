@@ -3,6 +3,8 @@ import { authEnv } from '@/envs/auth';
 import { type GenericProviderDefinition } from '../types';
 
 const FEISHU_AUTHORIZATION_URL = 'https://accounts.feishu.cn/open-apis/authen/v1/authorize';
+const FEISHU_CONTACT_USER_URL = 'https://open.feishu.cn/open-apis/contact/v3/users';
+const FEISHU_TENANT_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/authen/v2/oauth/token';
 const FEISHU_USERINFO_URL = 'https://open.feishu.cn/open-apis/authen/v1/user_info';
 
@@ -18,6 +20,7 @@ type FeishuUserProfile = {
   open_id?: string;
   tenant_key?: string;
   union_id?: string;
+  user_id?: string;
 };
 
 type FeishuUserInfoResponse = {
@@ -54,6 +57,21 @@ type FeishuTokenResponse = {
   msg?: string;
 } & FeishuTokenPayload;
 
+type FeishuContactUserResponse = {
+  code?: number;
+  data?: {
+    user?: FeishuUserProfile;
+  };
+  msg?: string;
+};
+
+type FeishuTenantTokenResponse = {
+  code?: number;
+  expire?: number;
+  msg?: string;
+  tenant_access_token?: string;
+};
+
 const isFeishuProfile = (value: unknown): value is FeishuUserProfile => {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
@@ -70,6 +88,66 @@ const parseScopes = (scope: string | undefined) =>
 
 const pickFeishuEmail = (...emails: Array<string | undefined>) =>
   emails.find((email): email is string => !!email?.trim());
+
+const resolveFeishuUserIdentifier = (
+  profile: FeishuUserProfile,
+  tokenPayload?: FeishuTokenPayload,
+): { type: 'open_id' | 'union_id' | 'user_id'; value: string } | null => {
+  const userId = profile.user_id ?? tokenPayload?.user_id;
+  if (userId) return { type: 'user_id', value: userId };
+
+  const openId = profile.open_id ?? tokenPayload?.open_id;
+  if (openId) return { type: 'open_id', value: openId };
+
+  const unionId = profile.union_id ?? tokenPayload?.union_id;
+  if (unionId) return { type: 'union_id', value: unionId };
+
+  return null;
+};
+
+const getTenantAccessToken = async (clientId: string, clientSecret: string) => {
+  const response = await fetch(FEISHU_TENANT_TOKEN_URL, {
+    body: JSON.stringify({
+      app_id: clientId,
+      app_secret: clientSecret,
+    }),
+    cache: 'no-store',
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+    },
+    method: 'POST',
+  });
+
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as FeishuTenantTokenResponse;
+  if (payload.code !== 0 || !payload.tenant_access_token) return null;
+
+  return payload.tenant_access_token;
+};
+
+const getContactProfile = async (
+  accessToken: string,
+  identifier: { type: 'open_id' | 'union_id' | 'user_id'; value: string },
+) => {
+  const url = new URL(`${FEISHU_CONTACT_USER_URL}/${identifier.value}`);
+  url.searchParams.set('user_id_type', identifier.type);
+
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'content-type': 'application/json; charset=utf-8',
+    },
+  });
+
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as FeishuContactUserResponse;
+  if (payload.code !== 0) return null;
+
+  return payload.data?.user;
+};
 
 const provider: GenericProviderDefinition<{
   AUTH_FEISHU_APP_ID: string;
@@ -159,6 +237,20 @@ const provider: GenericProviderDefinition<{
           profile.union_id ?? tokenPayload?.union_id ?? profile.open_id ?? tokenPayload?.open_id;
         if (!unionId) return null;
 
+        const identifier = resolveFeishuUserIdentifier(profile, tokenPayload);
+        let contactProfile: FeishuUserProfile | null = null;
+
+        if (identifier) {
+          contactProfile = await getContactProfile(tokens.accessToken, identifier);
+
+          if (!pickFeishuEmail(contactProfile?.email, contactProfile?.enterprise_email)) {
+            const tenantAccessToken = await getTenantAccessToken(clientId, clientSecret);
+            if (tenantAccessToken) {
+              contactProfile = (await getContactProfile(tenantAccessToken, identifier)) ?? contactProfile;
+            }
+          }
+        }
+
         // Prefer the user's real email when Feishu returns it so domain allowlists
         // and existing account linking continue to work. Fall back to a synthetic
         // email only when the tenant doesn't expose email fields at all.
@@ -166,21 +258,28 @@ const provider: GenericProviderDefinition<{
           pickFeishuEmail(
             profile.email,
             profile.enterprise_email,
+            contactProfile?.email,
+            contactProfile?.enterprise_email,
             tokenPayload?.email,
             tokenPayload?.enterprise_email,
           ) ?? `${unionId}@feishu.sso`;
 
-        return {
+        const resolvedProfile = {
           ...profile,
+          ...contactProfile,
+        };
+
+        return {
+          ...resolvedProfile,
           email,
           emailVerified: false,
           id: unionId,
           image:
-            profile.avatar_url ??
-            profile.avatar_thumb ??
-            profile.avatar_middle ??
-            profile.avatar_big,
-          name: profile.name ?? profile.en_name ?? unionId,
+            resolvedProfile.avatar_url ??
+            resolvedProfile.avatar_thumb ??
+            resolvedProfile.avatar_middle ??
+            resolvedProfile.avatar_big,
+          name: resolvedProfile.name ?? resolvedProfile.en_name ?? unionId,
         };
       },
       pkce: false,
