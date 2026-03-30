@@ -141,8 +141,9 @@ export class CredsExecutionRuntime {
 
       // Get the authorization URL
       // Note: In background execution, we cannot use window.location.origin
-      // The redirect URI should be configured for server-side OAuth flow
-      const redirectUri = `https://app.lobehub.com/oauth/callback/success?provider=${provider}`;
+      // Normalize APP_URL by removing trailing slash to avoid double-slash in redirectUri
+      const appUrl = (process.env.APP_URL || 'https://app.lobehub.com').replace(/\/+$/, '');
+      const redirectUri = `${appUrl}/oauth/callback/success?provider=${provider}`;
       const response = await this.credsService.getOAuthAuthorizeUrl(provider, redirectUri);
 
       // In server-side context, return the URL for user to click

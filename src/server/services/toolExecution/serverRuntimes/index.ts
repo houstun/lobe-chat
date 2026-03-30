@@ -22,6 +22,7 @@ import { skillStoreRuntime } from './skillStore';
 import { taskRuntime } from './task';
 import { topicReferenceRuntime } from './topicReference';
 import { type ServerRuntimeFactory, type ServerRuntimeRegistration } from './types';
+import { userInteractionRuntime } from './userInteraction';
 import { webBrowsingRuntime } from './webBrowsing';
 
 /**
@@ -54,6 +55,7 @@ registerRuntimes([
   briefRuntime,
   taskRuntime,
   topicReferenceRuntime,
+  userInteractionRuntime,
   credsRuntime,
 ]);
 

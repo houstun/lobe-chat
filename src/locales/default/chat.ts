@@ -452,6 +452,8 @@ export default {
     'A reason helps the Agent understand your boundaries and improve future actions',
   'tool.intervention.rejectTitle': 'Reject this Skill call',
   'tool.intervention.rejectedWithReason': 'This Skill call was rejected: {{reason}}',
+  'tool.intervention.pending': 'Pending',
+  'tool.intervention.scrollToIntervention': 'View',
   'tool.intervention.toolAbort': 'You canceled this Skill call',
   'tool.intervention.toolRejected': 'This Skill call was rejected',
   'toolAuth.authorize': 'Authorize',
